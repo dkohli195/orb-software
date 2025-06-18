@@ -17,4 +17,5 @@ prost = "0.12"
 bytes = { workspace = true }
 eyre = { workspace = true }
 color-eyre = { workspace = true }
+colored = "2.0"
 orb-messages = { git = "https://github.com/worldcoin/orb-messages", rev = "a169291163a489cd4aa1085261293b65df8a4d02" }

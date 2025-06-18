@@ -1,5 +1,6 @@
 use bytes::{Buf, BytesMut};
 use color_eyre::eyre::Result;
+use colored::*;
 use prost::Message;
 use std::path::Path;
 use tokio::io::AsyncReadExt;
@@ -86,6 +87,21 @@ async fn main() -> Result<()> {
                                         match msg {
                                             orb_messages::mcu_message::Message::JMessage(jetson_msg) => {
                                                 info!("Type: JetsonToMcu");
+                                                // Check if this is a RingLedsSequence and visualize it
+                                                if let Some(payload) = &jetson_msg.payload {
+                                                    if let orb_messages::main::jetson_to_mcu::Payload::RingLedsSequence(ring_seq) = payload {
+                                                        if let Some(data_format) = &ring_seq.data_format {
+                                                            match data_format {
+                                                                orb_messages::main::user_ring_le_ds_sequence::DataFormat::RgbUncompressed(rgb_data) => {
+                                                                    visualize_ring_leds(rgb_data, jetson_msg.ack_number);
+                                                                }
+                                                                _ => {
+                                                                    info!("Ring LEDs (other format)");
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                                 info!("Message details: {:?}", jetson_msg);
                                             }
                                             orb_messages::mcu_message::Message::MMessage(_) => {
@@ -116,6 +132,17 @@ async fn main() -> Result<()> {
             Err(e) => {
                 error!("Failed to accept connection: {}", e);
             }
+        }
+    }
+}
+
+/// Simple LED ring visualizer
+fn visualize_ring_leds(rgb_data: &[u8], ack_number: u32) {
+    let block_char = "\u{2588}";
+    for chunk in rgb_data.chunks(3) {
+        if chunk.len() == 3 {
+            let (r, g, b) = (chunk[0], chunk[1], chunk[2]);
+            print!("{}", block_char.truecolor(r, g, b));
         }
     }
 }
