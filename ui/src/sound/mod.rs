@@ -14,7 +14,7 @@ use tokio::fs;
 /// ALSA sound card name.
 const SOUND_CARD_NAME: &str = "default";
 /// Path to the directory with the sound files.
-const SOUNDS_DIR: &str = "/home/worldcoin/data/sounds";
+const SOUNDS_DIR: &str = "data/sounds";
 const DEFAULT_LANGUAGE: Language = Language::En;
 /// Default master volume level.
 const DEFAULT_MASTER_VOLUME: f64 = 0.15;

@@ -16,7 +16,7 @@ use tracing::debug;
 use crate::beacon::beacon;
 use crate::engine::{Engine, Event, EventChannel, OperatingMode};
 use crate::observer::listen;
-use crate::serial::{Serial, StubSerial};
+use crate::serial::{IpcSerial, Serial, StubSerial};
 use crate::simulation::signup_simulation;
 
 mod beacon;
@@ -70,6 +70,10 @@ enum SimulationArgs {
         /// Use a stub serial device instead of a real one
         #[clap(long)]
         serial_stub: bool,
+
+        /// Use IPC serial device that forwards to another process
+        #[clap(long, conflicts_with = "serial_stub")]
+        serial_ipc: bool,
     },
 
     /// Operator-based signup, with QR codes
@@ -77,6 +81,10 @@ enum SimulationArgs {
         /// Use a stub serial device instead of a real one
         #[clap(long)]
         serial_stub: bool,
+
+        /// Use IPC serial device that forwards to another process
+        #[clap(long, conflicts_with = "serial_stub")]
+        serial_ipc: bool,
     },
 
     /// show-car, infinite loop of signup
@@ -84,6 +92,10 @@ enum SimulationArgs {
         /// Use a stub serial device instead of a real one
         #[clap(long)]
         serial_stub: bool,
+
+        /// Use IPC serial device that forwards to another process
+        #[clap(long, conflicts_with = "serial_stub")]
+        serial_ipc: bool,
     },
 }
 
@@ -135,18 +147,30 @@ async fn main_inner(args: Args) -> Result<()> {
     let hw = get_hw_version().await?;
     let (mut serial_input_tx, serial_input_rx) = mpsc::channel(INPUT_CAPACITY);
 
-    // Extract serial_stub flag from simulation subcommands only
-    let serial_stub = match &args.subcmd {
+    // Extract serial flags from simulation subcommands only
+    let (serial_stub, serial_ipc) = match &args.subcmd {
         SubCommand::Simulation(sim_args) => match sim_args {
-            SimulationArgs::SelfServe { serial_stub } => *serial_stub,
-            SimulationArgs::Operator { serial_stub } => *serial_stub,
-            SimulationArgs::ShowCar { serial_stub } => *serial_stub,
+            SimulationArgs::SelfServe {
+                serial_stub,
+                serial_ipc,
+            } => (*serial_stub, *serial_ipc),
+            SimulationArgs::Operator {
+                serial_stub,
+                serial_ipc,
+            } => (*serial_stub, *serial_ipc),
+            SimulationArgs::ShowCar {
+                serial_stub,
+                serial_ipc,
+            } => (*serial_stub, *serial_ipc),
         },
-        _ => false,
+        _ => (false, false),
     };
 
     if serial_stub {
         Serial::spawn(StubSerial, serial_input_rx)?;
+    } else if serial_ipc {
+        let ipc_device = IpcSerial::new("/tmp/orb-uart.sock")?;
+        Serial::spawn(ipc_device, serial_input_rx)?;
     } else {
         let serial_device = match hw {
             Hardware::Diamond => Some("/dev/ttyTHS1"),
@@ -168,38 +192,55 @@ async fn main_inner(args: Args) -> Result<()> {
             };
         }
         SubCommand::Simulation(sim_args) => {
-            let ui: Box<dyn Engine> = if hw == Hardware::Diamond {
-                let ui = engine::DiamondJetson::spawn(&mut serial_input_tx);
-                ui.clone_tx()
-                    .send(Event::Flow {
-                        mode: match sim_args {
-                            SimulationArgs::Operator { .. } => OperatingMode::Operator,
-                            _ => OperatingMode::SelfServe,
-                        },
-                    })
-                    .unwrap();
-                Box::new(ui)
-            } else {
-                let ui = engine::PearlJetson::spawn(&mut serial_input_tx);
-                ui.clone_tx()
-                    .send(Event::Flow {
-                        mode: match sim_args {
-                            SimulationArgs::Operator { .. } => OperatingMode::Operator,
-                            _ => OperatingMode::SelfServe,
-                        },
-                    })
-                    .unwrap();
-                Box::new(ui)
+            // Check if using IPC mode - if so, run IPC test instead of full simulation
+            let using_ipc = match sim_args {
+                SimulationArgs::SelfServe { serial_ipc, .. } => serial_ipc,
+                SimulationArgs::Operator { serial_ipc, .. } => serial_ipc,
+                SimulationArgs::ShowCar { serial_ipc, .. } => serial_ipc,
             };
-            match sim_args {
-                SimulationArgs::SelfServe { .. } => {
-                    signup_simulation(ui.as_ref(), hw, true, false).await?
-                }
-                SimulationArgs::Operator { .. } => {
-                    signup_simulation(ui.as_ref(), hw, false, false).await?
-                }
-                SimulationArgs::ShowCar { .. } => {
-                    signup_simulation(ui.as_ref(), hw, true, true).await?
+
+            if using_ipc {
+                tracing::info!("Running IPC message test instead of full simulation");
+                serial::test_ipc_messages(&mut serial_input_tx).await?;
+            } else {
+                // Run normal simulation with LED engine
+                let ui: Box<dyn Engine> = if hw == Hardware::Diamond {
+                    let ui = engine::DiamondJetson::spawn(&mut serial_input_tx);
+                    ui.clone_tx()
+                        .send(Event::Flow {
+                            mode: match sim_args {
+                                SimulationArgs::Operator { .. } => {
+                                    OperatingMode::Operator
+                                }
+                                _ => OperatingMode::SelfServe,
+                            },
+                        })
+                        .unwrap();
+                    Box::new(ui)
+                } else {
+                    let ui = engine::PearlJetson::spawn(&mut serial_input_tx);
+                    ui.clone_tx()
+                        .send(Event::Flow {
+                            mode: match sim_args {
+                                SimulationArgs::Operator { .. } => {
+                                    OperatingMode::Operator
+                                }
+                                _ => OperatingMode::SelfServe,
+                            },
+                        })
+                        .unwrap();
+                    Box::new(ui)
+                };
+                match sim_args {
+                    SimulationArgs::SelfServe { .. } => {
+                        signup_simulation(ui.as_ref(), hw, true, false).await?
+                    }
+                    SimulationArgs::Operator { .. } => {
+                        signup_simulation(ui.as_ref(), hw, false, false).await?
+                    }
+                    SimulationArgs::ShowCar { .. } => {
+                        signup_simulation(ui.as_ref(), hw, true, true).await?
+                    }
                 }
             }
         }

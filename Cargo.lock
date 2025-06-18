@@ -10147,6 +10147,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
+name = "uart-receiver"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "color-eyre",
+ "eyre",
+ "orb-messages 0.0.0 (git+https://github.com/worldcoin/orb-messages?rev=a169291163a489cd4aa1085261293b65df8a4d02)",
+ "prost 0.12.6",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "ucd-trie"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

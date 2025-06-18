@@ -66,12 +66,17 @@ pub async fn signup_simulation(
     ui.idle();
     if self_serve || showcar {
         // idle state is waiting for user QR code
+        info!("Here");
         ui.qr_scan_start(QrScanSchema::User);
     }
+
+    info!("here 1");
     time::sleep(Duration::from_secs(1)).await;
 
     // gimbal facing the user as much as possible
     ui.gimbal(1, 90000);
+
+    info!("here 2");
 
     time::sleep(Duration::from_secs(5)).await;
 
@@ -80,6 +85,8 @@ pub async fn signup_simulation(
         ui.signup_start_operator();
         time::sleep(Duration::from_secs(1)).await;
     }
+
+    info!("here 1");
 
     loop {
         if !showcar {

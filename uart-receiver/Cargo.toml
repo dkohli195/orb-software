@@ -1,0 +1,20 @@
+[package]
+name = "uart-receiver"
+version = "0.1.0"
+authors = ["Dhruv <opensource@worldcoin.org>"]
+publish = false
+
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+prost = "0.12"
+bytes = { workspace = true }
+eyre = { workspace = true }
+color-eyre = { workspace = true }
+orb-messages = { git = "https://github.com/worldcoin/orb-messages", rev = "a169291163a489cd4aa1085261293b65df8a4d02" }

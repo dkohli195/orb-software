@@ -46,6 +46,7 @@ members = [
   "test-utils",
   "thermal-cam-ctrl",
   "tools",
+  "uart-receiver",
   "ui",
   "ui/cone",
   "ui/pid",
