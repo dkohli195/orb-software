@@ -34,3 +34,17 @@ Compiles and runs on both linux and macOS.
 ## Tokio Console Support
 
 Supported. See the [toplevel README](../README.md) for info on how to use it.
+
+## IPC Serial Simulation
+
+Run the UI simulation with IPC serial communication (bypasses hardware dependencies):
+
+```shell
+# Terminal 1: Start UART receiver
+./target/x86_64-unknown-linux-gnu/debug/uart-receiver
+
+# Terminal 2: Run simulation with IPC
+./target/x86_64-unknown-linux-gnu/debug/orb-ui simulation show-car --serial-ipc
+```
+
+This sends LED messages via Unix socket to the uart-receiver, which displays colored LED visualization.
